@@ -1,0 +1,54 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "checkJs": false,
+    "declaration": false,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "noEmitHelpers": true,
+    "noEmitOnError": false,
+    "importHelpers": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "downlevelIteration": false,
+    "rootDir": ".",
+    "outDir": "./build",
+    "baseUrl": ".",
+    "incremental": true,
+    "composite": false,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "esModuleInterop": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "plugins": [
+      {
+        "transform": "typescript-transform-paths"
+      },
+      {
+        "transform": "@nestjs/swagger/plugin",
+        "introspectComments": true,
+        "dtoFileNameSuffix": [".openapi.ts", ".response.ts", ".dto.ts", "-response.ts"]
+      }
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "hardhat.config.ts",
+    "src/shared/scripts",
+    "src/protocol/deploy",
+    "./test"
+  ],
+  "exclude": ["node_modules", "./build/**/*.*"],
+  "files": ["./hardhat.config.ts"]
+}
