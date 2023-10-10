@@ -8,7 +8,7 @@ export class GovernanceController {
   constructor(private readonly governanceService: GovernanceService) {}
 
   @Get("/proposals")
-  getAllProposals(@Query("blocks") blocks = 100) {
+  getAllProposals(@Query("blocks") blocks: number) {
     return this.governanceService.getProposals(blocks);
   }
 

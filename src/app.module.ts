@@ -24,10 +24,11 @@ loggerStreams.push({
 
 @Module({
   imports: [
-    CustomConfigModule.forRoot({
-      isGlobal: true,
-      load: [config],
-    }),
+    // CustomConfigModule.forRoot({
+    //   isGlobal: true,
+    //   load: [config],
+    // }),
+    CustomConfigModule,
     LoggerModule,
     ConnectorModule,
     GovernanceModule,

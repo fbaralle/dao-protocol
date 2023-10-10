@@ -55,11 +55,14 @@ export class GovernanceService {
   async getProposals(blocks?: number) {
     const governorDeployBlock = governorContractData.receipt.blockNumber;
 
-    const lastBlockNumber = this.connectorService.provider._lastBlockNumber;
+    const lastBlockNumber = await this.connectorService.provider.getBlockNumber();
 
     const startBlock = blocks ? lastBlockNumber - blocks : governorDeployBlock;
 
-    this.logger.info(`Getting proposals from block ${startBlock} to latest block`);
+    this.logger.info(`Getting proposals from block ${startBlock} to latest block`, {
+      governorDeployBlock,
+      lastBlockNumber,
+    });
 
     const governor = this.connectorService.governorContract;
 
@@ -91,9 +94,13 @@ export class GovernanceService {
     const parsedProposals =
       allProposals && allProposals.length ? allProposals.map(getParsedProposal) : [];
 
+    const sortedList = parsedProposals.sort((a, b) => {
+      return a.blockNumber > b.blockNumber ? -1 : 1;
+    });
+
     this.logger.info("Proposals", allProposals);
 
-    return parsedProposals;
+    return sortedList;
   }
 
   async getProposalDetails(proposalId: string) {

@@ -4,7 +4,7 @@ import { ConnectorController } from "./connector.controller";
 
 @Global()
 @Module({
-  imports: [],
+  // imports: [CustomConfigService],
   controllers: [ConnectorController],
   providers: [ConnectorService],
   exports: [ConnectorService],
