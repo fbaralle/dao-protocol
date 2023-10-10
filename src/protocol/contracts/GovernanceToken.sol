@@ -7,11 +7,16 @@ contract GovernanceToken is ERC20Votes {
   /** 1 Million tokens (18 dec)*/
   uint256 public s_maxSupply = 1000000000000000000000000;
 
+  /**
+   * The deployer receives all of the supply,
+   * and has to distribute them to the members of the community
+   * so they can vote
+   */
   constructor() ERC20("TribalGovernanceToken", "TRBG") ERC20Permit("GovernanceToken") {
     _mint(msg.sender, s_maxSupply);
   }
 
-  // The functions below are overrides required by Solidity.
+  // - The functions below are overrides required by Solidity.
 
   /**
    * Used to update the snapshot of the blockchain,

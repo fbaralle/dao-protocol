@@ -1,4 +1,4 @@
-import config from "@/shared/config/config";
+import config from "../shared/config/config";
 
 const { SUPPORTED_NETWORKS, ETHERSCAN_API_KEY, COINMARKETCAP_API_KEY } = config();
 

@@ -1,4 +1,4 @@
-import network from "@/shared/config/network.config.js";
+import network from "../config/network.config";
 
 const COINMARKETCAP_API_KEY =
   process.env.COINMARKETCAP_API_KEY || "a0e6b7d3-34b7-47ec-afad-f150742ca6b4"; // just for testing purposes
@@ -12,7 +12,6 @@ const config = () => ({
   NETWORK: network().network,
   DEFAULT_DEV_NETWORK: network().defaultDevNetwork,
   IS_TESTNET: network().isTestnet,
-  TX_CHAINING_ENABLED: process.env.TX_CHAINING_ENABLED === "true",
   SUPPORTED_NETWORKS: {
     // Development fake blockchains
     hardhat: {
