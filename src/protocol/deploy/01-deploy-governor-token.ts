@@ -11,6 +11,7 @@ const deployGovernanceToken: DeployFunction = async function (hre: HardhatRuntim
   const { deployer } = await getNamedAccounts();
   log("----------------------------------------------------");
   log(`Deploying protocol at NETWORK: ${network.name}`);
+  log(`Deployer account: ${deployer}`);
   log("Deploying GovernanceToken and waiting for confirmations...");
   const governanceToken = await deploy("GovernanceToken", {
     from: deployer,

@@ -24,10 +24,16 @@ export class ConnectorService {
     const supportedNetworks = this.configService.get("SUPPORTED_NETWORKS");
 
     const network = supportedNetworks[currentNetworkName];
-    const url = network.url;
+    const url = network.providerUrl;
 
-    this.logger.info("Connecting provider...");
-    const provider = new ethers.providers.JsonRpcProvider(url, currentNetworkName);
+    this.logger.info("Connecting Json RPC Provider...");
+    this.logger.info({ network });
+
+    const provider = new ethers.providers.JsonRpcProvider(url, {
+      chainId: network.chainId,
+      name: currentNetworkName,
+    });
+    // const provider = new ethers.providers.Web3Provider(url, currentNetworkName);
 
     this.logger.info(
       `Provider Connected - Network: ${provider.network.name} - Chain ID: ${provider.network.chainId}`,

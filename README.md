@@ -21,7 +21,6 @@ Every env variable has a default to be used with Sepolia test network
 ```bash
 # .env
 
-NEXT=<SERVER_API_URL>
 NETWORK=<NETWORK_NAME>
 ETHERSCAN_API_KEY=<KEY>
 DEPLOYER_ACCOUNT_PRIVATE_KEY=<KEY>
@@ -35,14 +34,27 @@ COINMARKETCAP_API_KEY=<KEY>
 $ yarn install
 ```
 
-### Development in local blockchain
+## Development in local/hardhat blockchain
+To run and test the protocol using the local blockchain.
+As the protocol is automatically deployed when using the local blockchain,
+the next step should be skipped.
+
 ```bash
-# Run hardhat node
+# .env
+NETWORK="hardhat"
+```
+
+Open a new terminal window and navigate (`$ cd /<project directory>`) into project's main folder. Leave it open, as it will be running the local network.
+Fake Accounts list will be needed to use with the Metamask wallet provider in the browser.
+
+**Account #0:** Is the protocol deployer's account and will own all governance tokens that should be distributed among the other accounts (community members)
+```bash
+# Run hardhat node and mount local blockchain
 $ npx hardhat node
 ```
 
 ## Deploy Protocol
-
+To deploy
 ```bash
 # Deploy protocol in local hardhat blockchain
 $ yarn hardhat deploy --network hardhat
@@ -56,7 +68,7 @@ $ yarn hardhat deploy --network sepolia
 # development
 $ yarn run start
 
-# watch mode
+# Development watch mode
 $ yarn run start:dev
 
 # production mode

@@ -15,11 +15,12 @@ const config = () => ({
   SUPPORTED_NETWORKS: {
     // Development fake blockchains
     hardhat: {
+      providerUrl: "http://127.0.0.1:8545",
       chainId: 31337,
       allowUnlimitedContractSize: true,
     },
     localhost: {
-      url: "http://localhost:8545",
+      providerUrl: "http://localhost:8545",
       chainId: 31337,
       allowUnlimitedContractSize: true,
     },
@@ -27,6 +28,7 @@ const config = () => ({
     // Testnet blockchains
     sepolia: {
       url: SEPOLIA_RPC_URL,
+      providerUrl: SEPOLIA_RPC_URL,
       accounts: [DEPLOYER_ACCOUNT_PRIVATE_KEY],
       chainId: 11155111,
     },
