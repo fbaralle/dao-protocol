@@ -1,17 +1,19 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
-import { GovernanceService } from "./governance.service.js";
+import { GovernanceService, ProposalsListRange } from "./governance.service.js";
 import { ProposalDto } from "./dto/proposal.dto.js";
 import { ProposalVoteDto } from "./dto/proposal-vote.dto.js";
+import { CacheTTL } from "@nestjs/cache-manager";
 
 @Controller("governance")
 export class GovernanceController {
   constructor(private readonly governanceService: GovernanceService) {}
 
   @Get("/proposals")
-  getAllProposals(@Query("blocks") blocks: number) {
-    return this.governanceService.getProposals(blocks);
+  getAllProposals(@Query("blocks") rangeFilter: ProposalsListRange = ProposalsListRange.ALL) {
+    return this.governanceService.getProposals(rangeFilter);
   }
 
+  @CacheTTL(60 * 1000)
   @Get("/proposal/:proposalId")
   getProposalDetails(@Param("proposalId") proposalId: string) {
     return this.governanceService.getProposalDetails(proposalId);

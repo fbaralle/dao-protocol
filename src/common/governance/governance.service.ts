@@ -1,42 +1,33 @@
 import { ProposalState } from "@/shared/typescript/protocol";
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Bunyan, InjectLogger } from "nestjs-bunyan";
 import { ConnectorService, governorContractData } from "@/shared/connector/connector.provider";
-import { Contract, ethers } from "ethers";
+import { ethers } from "ethers";
 import { ProposalDto } from "./dto/proposal.dto";
 import { getParsedProposal } from "./utils";
 import { ProposalVoteDto } from "./dto/proposal-vote.dto";
-
-export const getContractEventFilter = (contract: Contract, eventName: string) => {
-  const encodedTopic = contract.filters?.[`${eventName}`]().topics?.[0];
-
-  if (!encodedTopic) throw new Error(`Invalid topic: ${encodedTopic}`);
-
-  return [encodedTopic];
-};
-
-export const getContractEvents = (
-  contract: Contract,
-  eventName: string,
-  fromBlockOrBlockhash: string | number = 0,
-  toBlock: string | number = "latest",
-) => {
-  return contract.queryFilter(
-    {
-      address: contract.address,
-      topics: getContractEventFilter(contract, eventName),
-    },
-    fromBlockOrBlockhash,
-    toBlock,
-  );
-};
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { getContractEvents, getStartBlockByFilter } from "./utils/contract-events";
+import { Cache } from "cache-manager";
 
 const BOX_STORE_METHOD = "store";
+
+export enum CacheKeyPrefix {
+  GET_PROPOSALS = "get-proposals",
+  GET_PROPOSAL_DETAILS = "get-proposal-details",
+}
+
+export enum ProposalsListRange {
+  DAY,
+  WEEK,
+  ALL,
+}
 
 @Injectable()
 export class GovernanceService {
   constructor(
     @InjectLogger() private logger: Bunyan,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private connectorService: ConnectorService,
   ) {}
 
@@ -52,14 +43,26 @@ export class GovernanceService {
     };
   }
 
-  async getProposals(blocks?: number) {
+  async getProposals(rangeFilter?: ProposalsListRange) {
+    const cacheKey = `${CacheKeyPrefix.GET_PROPOSALS}-${rangeFilter}`;
+    const cachedResult = await this.cacheManager.get<string>(cacheKey);
+
+    if (cachedResult && process.env.NODE_ENV !== "development") {
+      this.logger.info(
+        "Retrieving cached result for key:",
+        cacheKey,
+        `range filter: ${rangeFilter}`,
+      );
+      const res = cachedResult;
+      return res;
+    }
+
     const governorDeployBlock = governorContractData.receipt.blockNumber;
-
     const lastBlockNumber = await this.connectorService.provider.getBlockNumber();
-
-    const startBlock = blocks ? lastBlockNumber - blocks : governorDeployBlock;
+    const startBlock = getStartBlockByFilter(lastBlockNumber, governorDeployBlock, rangeFilter);
 
     this.logger.info(`Getting proposals from block ${startBlock} to latest block`, {
+      rangeFilter,
       governorDeployBlock,
       lastBlockNumber,
     });
@@ -98,7 +101,20 @@ export class GovernanceService {
       return a.blockNumber > b.blockNumber ? -1 : 1;
     });
 
-    this.logger.info("Proposals", allProposals);
+    if (process.env.NODE_ENV !== "development") {
+      /** TTL in milliseconds */
+      const ttl = ProposalsListRange.DAY ? 60 * 1000 : 2 * 60 * 1000;
+
+      this.logger.info(
+        "Adding new result to cache",
+        cacheKey,
+        new Date().toLocaleDateString(),
+        `with ttl ${ttl} sec.`,
+      );
+      await this.cacheManager.set(cacheKey, sortedList, ttl);
+    }
+
+    this.logger.info(`Proposals List: [Range: ${rangeFilter}], with ${sortedList.length} items`);
 
     return sortedList;
   }

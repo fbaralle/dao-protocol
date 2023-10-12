@@ -8,7 +8,6 @@ import { CacheModule, CacheInterceptor } from "@nestjs/cache-manager";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { GovernanceModule } from "./common/governance/governance.module";
 import { ConnectorModule } from "./shared/connector/connector.module";
-import config from "@/shared/config/config";
 import { CustomConfigModule } from "./shared/config/configuration.module";
 
 const loggerStreams: any[] = [];
@@ -24,10 +23,6 @@ loggerStreams.push({
 
 @Module({
   imports: [
-    // CustomConfigModule.forRoot({
-    //   isGlobal: true,
-    //   load: [config],
-    // }),
     CustomConfigModule,
     LoggerModule,
     ConnectorModule,
@@ -42,7 +37,6 @@ loggerStreams.push({
       },
     }),
     CacheModule.register({
-      ttl: 300, // 6 minutes in secs.
       isGlobal: true,
     }),
   ],

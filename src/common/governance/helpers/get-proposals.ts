@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { getContractEvents } from "../governance.service";
+import { getContractEvents } from "../utils/contract-events";
 
 export async function getAllProposals() {
   const governor = await ethers.getContract("GovernorContract");
