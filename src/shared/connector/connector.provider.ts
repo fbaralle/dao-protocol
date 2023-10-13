@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import governorContractJson from "@/protocol/abis/sepolia/GovernorContract.json";
 import boxContractJson from "@/protocol/abis/sepolia/Box.json";
+import timeLockContractJson from "@/protocol/abis/sepolia/TimeLock.json";
 import { Bunyan, InjectLogger } from "nestjs-bunyan";
 import { CustomConfigService } from "../config/configuration.service";
 
@@ -13,6 +14,7 @@ export class ConnectorService {
   provider: ethers.providers.BaseProvider;
   governorContract: Contract;
   boxContract: Contract;
+  timeLockContract: Contract;
   wallet: Wallet;
 
   constructor(
@@ -33,7 +35,6 @@ export class ConnectorService {
       chainId: network.chainId,
       name: currentNetworkName,
     });
-    // const provider = new ethers.providers.Web3Provider(url, currentNetworkName);
 
     this.logger.info(
       `Provider Connected - Network: ${provider.network.name} - Chain ID: ${provider.network.chainId}`,
@@ -52,11 +53,18 @@ export class ConnectorService {
       boxContractJson.abi,
       this.provider,
     );
+
+    this.timeLockContract = new ethers.Contract(
+      timeLockContractJson.address,
+      timeLockContractJson.abi,
+      this.provider,
+    );
   }
 
   async getCurrentNetwork() {
     const gasPrice = await this.provider.getGasPrice();
+    const currentBlock = await this.provider.getBlockNumber();
     const { chainId, name } = this.provider.network;
-    return { chainId, name, gasPrice: BigNumber.from(gasPrice).toString() };
+    return { chainId, name, gasPrice: BigNumber.from(gasPrice).toString(), currentBlock };
   }
 }

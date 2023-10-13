@@ -8,8 +8,8 @@ export const getParsedProposal = (p: any) => {
           targets: p?.args?.targets ?? null,
           signatures: p?.args?.signatures ?? null,
           calldatas: p?.args?.calldatas ?? null,
-          startBlock: p?.args?.startBlock.toString?.() ?? null,
-          endBlock: p?.args?.endBlock.toString?.() ?? null,
+          createdAtBlock: p?.args?.startBlock?.toString?.() ?? null,
+          expiresAtBlock: p?.args?.endBlock?.toString?.() ?? null,
           description: p?.args?.description ?? null,
         },
       }

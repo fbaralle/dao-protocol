@@ -9,6 +9,8 @@ import { ProposalVoteDto } from "./dto/proposal-vote.dto";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { getContractEvents, getStartBlockByFilter } from "./utils/contract-events";
 import { Cache } from "cache-manager";
+import { VOTING_DELAY, VOTING_PERIOD } from "@/config/helper-hardhat-config";
+import { ProposalActionDto } from "./dto/proposal-action.dto";
 
 const BOX_STORE_METHOD = "store";
 
@@ -30,6 +32,15 @@ export class GovernanceService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private connectorService: ConnectorService,
   ) {}
+
+  async getCurrentValue() {
+    const box = this.connectorService.boxContract;
+    const value = (await box.retrieve()) as bigint;
+
+    return {
+      value: value.toString(),
+    };
+  }
 
   async getProposalState(proposalId: string) {
     const governor = this.connectorService.governorContract;
@@ -75,24 +86,8 @@ export class GovernanceService {
       startBlock,
       "latest",
     );
-    const proposalsCanceled = await getContractEvents(
-      governor,
-      "ProposalCanceled",
-      startBlock,
-      "latest",
-    );
-    const proposalsExecuted = await getContractEvents(
-      governor,
-      "ProposalExecuted",
-      startBlock,
-      "latest",
-    );
 
-    const allProposals = [
-      ...(proposalsCreated || []),
-      ...(proposalsCanceled || []),
-      ...(proposalsExecuted || []),
-    ];
+    const allProposals = proposalsCreated;
 
     const parsedProposals =
       allProposals && allProposals.length ? allProposals.map(getParsedProposal) : [];
@@ -120,32 +115,69 @@ export class GovernanceService {
   }
 
   async getProposalDetails(proposalId: string) {
-    this.logger.info("Getting proposal by ID:", proposalId);
-
+    this.logger.info("Getting proposal by ID:", proposalId, typeof proposalId);
     if (!proposalId) throw new Error(`Invalid proposalId: ${proposalId}`);
 
     const governor = this.connectorService.governorContract;
-    const proposalState = await this.getProposalState(proposalId);
 
-    /** What block # the proposal was snapshot. Used to fetch proposal data. Voting starts in the next block + voting delay */
-    const blockSnapshot = (await governor.proposalSnapshot(proposalId))?.toNumber?.();
+    /** The block number the proposal voting expires */
+    const blockDeadline = (await governor.proposalDeadline(proposalId))?.toNumber?.();
 
-    const proposalsCreated = await getContractEvents(governor, "ProposalCreated", 0, "latest");
-    this.logger.info("proposals found in block", proposalsCreated);
-    const foundProposal = proposalsCreated[0];
+    const proposalCreationBlock = blockDeadline - (VOTING_PERIOD + VOTING_DELAY);
+    console.log({ proposalCreationBlock });
+
+    this.logger.info(
+      `Searching proposal event between blocks ${proposalCreationBlock} - ${
+        proposalCreationBlock + 1
+      }`,
+    );
+
+    const proposalsCreated = await getContractEvents(
+      governor,
+      "ProposalCreated",
+      proposalCreationBlock,
+      proposalCreationBlock + 1,
+    );
+
+    this.logger.info(`Proposals found in block: ${proposalsCreated.length}`);
+
+    const foundProposal = proposalsCreated.find(
+      (p) => p?.args?.proposalId.toString?.() === proposalId,
+    );
+
     if (!foundProposal) throw new Error(`Proposal not found with ID: ${proposalId}`);
 
     const parsedProposal = getParsedProposal(foundProposal);
 
-    /** The block number the proposal voting expires */
-    const blockDeadline = (await governor.proposalDeadline(proposalId))?.toNumber?.();
+    /** What block # the proposal was snapshot. Used to fetch proposal data. Voting starts in the next block + voting delay */
+    const blockSnapshot = (await governor.proposalSnapshot(proposalId))?.toNumber?.();
+    const proposalState = await this.getProposalState(proposalId);
     const proposalVotesRes = await governor.proposalVotes(proposalId);
     const proposalVotes = {
       againstVotes: proposalVotesRes?.againstVotes?.toString?.() || null,
       forVotes: proposalVotesRes?.forVotes?.toString?.() || null,
       abstainVotes: proposalVotesRes?.abstainVotes?.toString?.() || null,
     };
-    return { ...parsedProposal, ...proposalState, blockSnapshot, blockDeadline, proposalVotes };
+
+    const executionEta = (await governor.proposalEta(proposalId)).toString();
+
+    const proposalResult = {
+      ...parsedProposal,
+      ...proposalState,
+      blockSnapshot,
+      blockDeadline,
+      proposalVotes,
+    };
+    this.logger.info(`Retrieving proposal ${proposalId}`, proposalResult);
+
+    return {
+      ...parsedProposal,
+      ...proposalState,
+      blockSnapshot,
+      blockDeadline,
+      proposalVotes,
+      executionEta,
+    };
   }
 
   async buildProposalTx(proposalDto: ProposalDto) {
@@ -173,11 +205,22 @@ export class GovernanceService {
       proposalContentString,
     );
 
+    const estimatedGas = await governor.estimateGas.propose(
+      [box.address], // proposal contract
+      [0], // eth to transfer
+      [encodedFunctionCall], // call data
+      proposalContentString,
+    );
+
     const serlializedTx = ethers.utils.serializeTransaction(unsignedProposalTx);
 
     this.logger.info("Proposal Tx Serialized", serlializedTx);
 
-    return { unsigned_tx: serlializedTx, is_serialized: true };
+    return {
+      unsigned_tx: serlializedTx,
+      is_serialized: true,
+      estimated_gas: estimatedGas.toString(),
+    };
   }
 
   async buildVoteProposalTx(proposalVoteDto: ProposalVoteDto) {
@@ -194,33 +237,79 @@ export class GovernanceService {
     return { unsigned_tx: serlializedTx, is_serialized: true };
   }
 
-  async propose(proposalDto: ProposalDto) {
-    const { newValue, title, description } = proposalDto;
-    const proposalBody = `###${title} \n${description}`;
+  async buildQueueTx(proposalAction: ProposalActionDto) {
+    const { proposalId } = proposalAction;
+    this.logger.info("Building queue proposal by ID:", proposalId);
+    const proposal = await this.getProposalDetails(proposalId);
+    this.logger.info("Proposal to queue:", proposal);
 
-    this.logger.info("Creating new proposal...");
-
-    const governor = this.connectorService.governorContract;
     const box = this.connectorService.boxContract;
+    const governor = this.connectorService.governorContract;
 
-    this.logger.info(
-      `Proposing ${BOX_STORE_METHOD} on ${box.address} with [${newValue}]. Content: ${proposalBody}`,
-    );
-    const encodedFunctionCall = box.interface.encodeFunctionData(BOX_STORE_METHOD, [newValue]);
-
-    const proposeTx = await governor.propose(
-      [box.address], // proposal contract
-      [0], // eth to transfer
-      [encodedFunctionCall], // call data
-      proposalBody,
+    const encodedFunctionCall = proposal.content.calldatas[0];
+    const descriptionHash = ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes(proposal.content.description),
     );
 
-    const proposeReceipt = await proposeTx.wait();
-    const proposalId = proposeReceipt.events[0].args.proposalId;
+    const unsignedQueueTx = await governor.populateTransaction.queue(
+      [box.address],
+      [0],
+      [encodedFunctionCall],
+      descriptionHash,
+    );
 
-    this.logger.info("Proposal Submitted at Tx:", proposeReceipt);
-    this.logger.info("Proposed with proposal ID:", proposalId);
+    const estimatedGas = await governor.estimateGas.queue(
+      [box.address],
+      [0],
+      [encodedFunctionCall],
+      descriptionHash,
+    );
 
-    return proposeReceipt;
+    const serlializedTx = ethers.utils.serializeTransaction(unsignedQueueTx);
+    this.logger.info("Proposal Tx Serialized", serlializedTx);
+
+    return {
+      unsigned_tx: serlializedTx,
+      is_serialized: true,
+      estimated_gas: estimatedGas.toString(),
+    };
+  }
+
+  async buildExecuteTx(proposalAction: ProposalActionDto) {
+    const { proposalId } = proposalAction;
+    this.logger.info("Building execute proposal by ID:", proposalId);
+    const proposal = await this.getProposalDetails(proposalId);
+    this.logger.info("Proposal to execute:", proposal);
+
+    const box = this.connectorService.boxContract;
+    const governor = this.connectorService.governorContract;
+
+    const encodedFunctionCall = proposal.content.calldatas[0];
+    const descriptionHash = ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes(proposal.content.description),
+    );
+
+    const unsignedQueueTx = await governor.populateTransaction.execute(
+      [box.address],
+      [0],
+      [encodedFunctionCall],
+      descriptionHash,
+    );
+
+    const estimatedGas = await governor.estimateGas.execute(
+      [box.address],
+      [0],
+      [encodedFunctionCall],
+      descriptionHash,
+    );
+
+    const serlializedTx = ethers.utils.serializeTransaction(unsignedQueueTx);
+    this.logger.info("Proposal Tx Serialized", serlializedTx);
+
+    return {
+      unsigned_tx: serlializedTx,
+      is_serialized: true,
+      estimated_gas: estimatedGas.toString(),
+    };
   }
 }
